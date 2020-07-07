@@ -1,3 +1,8 @@
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
 public class Checkers {
 
     public enum Square {
@@ -9,11 +14,11 @@ public class Checkers {
     }
 
     private Square[][] board;
-    private int boardSize;
+    private final int boardSize;
 
-    public Checkers() {
+    public Checkers(int boardSize) {
 
-        boardSize = 8;
+        this.boardSize = boardSize;
         board = new Square[boardSize][boardSize];
         int i = 0, startAt0 = 0;
 
@@ -56,18 +61,76 @@ public class Checkers {
         }
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        for (int i=0; i<boardSize; i++) sb.append(" _");
-        sb.append("\n");
+
+        sb.append("  ");
+        for (int c=0; c<boardSize; c++)
+            sb.append(" ").append((char)('A'+c));
+        sb.append('\n');
 
         for (int i=0; i<boardSize; i++) {
-            sb.append("|");
+            sb.append(boardSize-i).append(" |");
             for (Square s : board[i])
                 sb.append(squareToString(s) + "|");
-            sb.append("\n");
+            sb.append(' ').append(boardSize-i).append('\n');
         }
+
+        sb.append("  ");
+        for (int c=0; c<boardSize; c++)
+            sb.append(" ").append((char)('A'+c));
+
         return sb.toString();
     }
+
+    private boolean isOther(int i, int j, int k, int l) {
+        Square s1 = board[i][j], s2 = board[k][l];
+        return (
+                // can move to other square if am self
+                // and other is opponent or empty
+                ((s1==Square.SELF || s1==Square.SELFKING)
+                    && (s2!=Square.SELF && s2!=Square.SELFKING))
+                // or can move if am oppon and other is
+                // self or empty square
+                || ((s1==Square.OPPON || s1==Square.OPPONKING)
+                    && (s2!=Square.OPPON && s2!=Square.OPPONKING))
+        );
+    }
+
+    private List<int[]> getDiagSquares(int i, int j) {
+        List<int[]> dList = new LinkedList<>();
+        if (i+1<boardSize)
+            if (j+1<boardSize)
+                dList.add(new int[]{i+1,j+1});
+            if (j-1>=0)
+                dList.add(new int[]{i+1,j-1});
+        if (i-1>=0)
+            if (j+1<boardSize)
+                dList.add(new int[]{i-1,j+1});
+            if (j-1>=0)
+                dList.add(new int[]{i-1,j-1});
+        return dList;
+    }
+
+    private List<int[]> getMovesRecur(int i, int j) {
+        List<int[]> move = new LinkedList<>();
+        for (int[] diag : getDiagSquares(i,j)) {
+            if (isOther(i, j, diag[0], diag[1]))
+                ;
+        }
+
+        return move;
+    }
+
+    private Set<int[][]> getMovesSelf() {
+        Set<int[][]> moves = new HashSet<>();
+        for (int i=boardSize-1; i>=0; i--)
+            for (int j=0; j<boardSize; j++)
+                ;
+
+        return moves;
+    }
+
 
 }
