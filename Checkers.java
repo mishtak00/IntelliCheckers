@@ -41,10 +41,12 @@ public class Checkers {
         for (; i<boardSize; i++)
             for (int j=0; j<boardSize; j++)
                 board[i][j]=Square.EMPTY;
-        board[5][0]=Square.SELF; board[4][1]=Square.OPPON;
-        board[2][1]=Square.OPPONKING; board[0][1]=Square.OPPON;
+        board[6][4]=Square.SELF; board[5][3]=Square.OPPON;
+        board[3][1]=Square.OPPONKING; board[1][1]=Square.OPPON;
+        board[3][3]=Square.OPPONKING;
 
-        System.out.println(this);
+
+        System.out.print(this);
 
         List<int[]> dList = getDiagSquares(5,0);
         for (int[] sq : dList)
@@ -52,27 +54,15 @@ public class Checkers {
 
         System.out.println(isOther(5,0,4,1));
         System.out.println(canCapture(5,0,4,1));
-        List<int[]> mList = getMovesRecur(5,0);
-        for (int[] mv : mList)
-            printBoardSquare(mv);
 
-        board[5][2]=Square.SELFKING;
-        System.out.println(this);
-        List<int[]> dList2 = getDiagSquares(5,2);
-        for (int[] sq : dList2)
-            printBoardSquare(sq);
 
-        List<int[]> mList2 = getMovesRecur(5,2);
-        for (int[] mv : mList2)
-            printBoardSquare(mv);
-
-        board[4][3]=Square.OPPONKING;
-        System.out.println(this);
-        Map<int[],List<int[]>> mvSet = getMovesSelf();
-        for (Map.Entry<int[], List<int[]>> mvs : mvSet.entrySet()) {
-            System.out.printf("Moves for %s : %s\n",
-                    boardSquareToString(mvs.getKey()),
-                    moveListToString(mvs.getValue()));
+        Map<int[],Set<List<int[]>>> mvSet = getMovesSelf();
+        for (Map.Entry<int[], Set<List<int[]>>> moves : mvSet.entrySet()) {
+            for (List<int[]> mv : moves.getValue()) {
+                System.out.printf("Move for %s : %s\n",
+                        boardSquareToString(moves.getKey()),
+                        moveListToString(mv));
+            }
         }
 
     }
@@ -134,6 +124,7 @@ public class Checkers {
         sb.append("  ");
         for (int c=0; c<boardSize; c++)
             sb.append(" ").append((char)('A'+c));
+        sb.append('\n');
 
         return sb.toString();
     }
@@ -150,10 +141,13 @@ public class Checkers {
 
         // only forward diagonals for normals
         if (curr==Square.SELF || curr==Square.OPPON) {
+
             // find diags: towards lower indices for self
             // towards higher indices for opponent
             int selfOrOpp = board[i][j]==Square.SELF ? -1 : 1;
-            if (i+selfOrOpp<boardSize) {
+            int destx = i+selfOrOpp;
+
+            if (destx>=0 && destx<boardSize) {
                 if (j+1<boardSize)
                     dList.add(new int[]{i+selfOrOpp, j+1});
                 if (j-1>=0)
@@ -203,31 +197,73 @@ public class Checkers {
                 );
     }
 
-    private List<int[]> getMovesRecur(int i, int j) {
-        List<int[]> move = new LinkedList<>();
-
+    private void findCapturesRecur(Set<List<int[]>> moves,
+                                      List<int[]> mv,
+                                      int i, int j) {
+        int captures = 0;
         for (int[] diag : getDiagSquares(i,j)) {
 
-            // move over and capture opponent square
+            // if can move over and capture opponent square
             if (canCapture(i, j, diag[0], diag[1])) {
+                captures++;
+
+                // calculate destination square coords
+                // and add move to the moveset
                 int destx = i+2*(diag[0]-i), desty = j+2*(diag[1]-j);
-                move.add(new int[]{destx, desty});
+                int[] destSq = {destx, desty};
+                mv.add(destSq);
+
                 // temporarily set board as if move was taken
                 board[destx][desty] = board[i][j];
+                Square temp = board[diag[0]][diag[1]];
+                board[diag[0]][diag[1]] = Square.EMPTY;
+                System.out.print(this);
+
                 // recurse from the new position
-                // to find consecutive moves
-                move.addAll(getMovesRecur(destx, desty));
+                // to find consecutive captures
+                findCapturesRecur(moves, mv, destx, desty);
+
                 // reset board to original state
                 board[destx][desty] = Square.EMPTY;
+                board[diag[0]][diag[1]] = temp;
 
-                return move;
+                System.out.print(this);
+
             }
-
-            // move to empty square
 
         }
 
-        return move;
+        /* if cannot capture anything then consecutive capture
+         * is stopped, we're at a leaf node in the move tree,
+         * adds the traversal path taken to the moveset
+         * deletes current leaf node from move list
+         * to achieve backtracking with the list structure
+         */
+        if (captures==0 && mv.size()>0) {
+            moves.add(new LinkedList<>(mv));
+            mv.remove(mv.size()-1);
+        }
+
+    }
+
+    private void findMovesToEmptySq(Set<List<int[]>> moves,
+                                              int i, int j) {
+        for (int[] diag : getDiagSquares(i,j))
+            if (board[diag[0]][diag[1]]==Square.EMPTY) {
+                List<int[]> mv = new LinkedList<>();
+                mv.add(diag);
+                moves.add(mv);
+            }
+    }
+
+    private Set<List<int[]>> getMoves(int i, int j) {
+        Set<List<int[]>> moves = new HashSet<>();
+
+        findCapturesRecur(moves, new LinkedList<>(), i, j);
+
+        findMovesToEmptySq(moves, i, j);
+
+        return moves;
     }
 
     private static boolean isSelf(Square s) {
@@ -242,14 +278,16 @@ public class Checkers {
         return s==Square.EMPTY;
     }
 
-    private Map<int[], List<int[]>> getMovesSelf() {
-        Map<int[], List<int[]>> moves = new HashMap<>();
+    private Map<int[], Set<List<int[]>>> getMovesSelf() {
+        Map<int[], Set<List<int[]>>> mMap = new HashMap<>();
         for (int i=boardSize-1; i>=0; i--)
-            for (int j=0; j<boardSize; j++)
-                if (isSelf(board[i][j])) {
-                    moves.put(new int[]{i,j},getMovesRecur(i,j));
+            for (int j=0; j<boardSize; j++) {
+                Set<List<int[]>> moves = getMoves(i,j);
+                if (isSelf(board[i][j]) && !moves.isEmpty()) {
+                    mMap.put(new int[]{i,j}, getMoves(i,j));
                 }
-        return moves;
+            }
+        return mMap;
     }
 
 
